@@ -1931,6 +1931,20 @@ WarpX::ReadParameters ()
         }
     }
 
+    if (std::find(particle_boundary_hi.begin(), particle_boundary_hi.end(),
+                  ParticleBoundaryType::Moving_Wall) != particle_boundary_hi.end()) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(evolve_scheme == EvolveScheme::Explicit,
+            "moving_wall requires algo.evolve_scheme = explicit");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_do_subcycling,
+            "moving_wall does not support warpx.do_subcycling");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_moving_window,
+            "moving_wall does not support a moving window");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::all_of(m_v_galilean.begin(), m_v_galilean.end(),
+                        [](amrex::Real v) { return v == 0._rt; }),
+            "moving_wall does not support a nonzero Galilean velocity");
+    }
+
     // Setup pec_insulator boundary conditions
     pec_insulator_boundary = std::make_unique<PEC_Insulator>();
 

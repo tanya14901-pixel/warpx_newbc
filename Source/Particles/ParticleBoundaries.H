@@ -80,6 +80,8 @@ struct ParticleBoundaries
         ParticleBoundaryType zmin_bc;
         ParticleBoundaryType zmax_bc;
         amrex::Real m_uth = 0.;
+        amrex::Real moving_wall_beta = 0.;
+        amrex::Real moving_wall_gamma_sq = 1.;
 
         amrex::ParserExecutor<1> reflection_model_xlo;
         amrex::ParserExecutor<1> reflection_model_xhi;

@@ -204,6 +204,14 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies,
 #endif
     m_boundary_conditions.BuildReflectionModelParsers();
 
+    if (m_boundary_conditions.data.xmax_bc == ParticleBoundaryType::Moving_Wall) {
+        const amrex::ParmParse pp_boundary("boundary");
+        auto& data = m_boundary_conditions.data;
+        utils::parser::getWithParser(pp_boundary, "moving_wall_beta", data.moving_wall_beta);
+        data.moving_wall_gamma_sq = 1._rt /
+            ((1._rt - data.moving_wall_beta) * (1._rt + data.moving_wall_beta));
+    }
+
     pp_particles.query("crop_on_PEC_boundary", m_crop_on_PEC_boundary);
 }
 
@@ -2964,6 +2972,7 @@ WarpXParticleContainer::ApplyBoundaryConditions ()
 
     for (int lev = 0; lev <= finestLevel(); ++lev)
     {
+        const amrex::Real boundary_dt = WarpX::GetInstance().getdt(lev);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -3025,7 +3034,7 @@ WarpXParticleContainer::ApplyBoundaryConditions ()
                         transform_momentum_to_curvilinear(ux[i], uy[i], uz[i], y, z);
 #endif
                         ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,
-                                                                  ux[i], uy[i], uz[i], particle_lost,
+                                                                  ux[i], uy[i], uz[i], boundary_dt, particle_lost,
                                                                   boundary_conditions, engine);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                         transform_momentum_to_cartesian(ux[i], uy[i], uz[i], y, z);

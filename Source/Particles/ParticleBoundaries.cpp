@@ -10,6 +10,8 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 
+#include <cmath>
+
 namespace warpx::particles
 {
 
@@ -84,6 +86,32 @@ namespace warpx::particles
             detail::check_consistency(
                 particle_boundary_lo, particle_boundary_hi,
                 is_field_boundary_periodic);
+
+            bool moving_wall = false;
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    particle_boundary_lo[idim] != ParticleBoundaryType::Moving_Wall,
+                    "moving_wall is only supported at the Cartesian x_max particle boundary");
+                if (particle_boundary_hi[idim] == ParticleBoundaryType::Moving_Wall) {
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(idim == 0,
+                        "moving_wall is only supported at the Cartesian x_max particle boundary");
+#else
+                    amrex::Abort("moving_wall requires Cartesian 2D (XZ) or 3D geometry");
+#endif
+                    moving_wall = true;
+                }
+            }
+            if (moving_wall) {
+                amrex::Real beta;
+                utils::parser::getWithParser(pp_boundary, "moving_wall_beta", beta);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(std::isfinite(beta) && std::abs(beta) < 1.,
+                    "boundary.moving_wall_beta must be finite and satisfy abs(beta) < 1");
+                bool reflect_all = false;
+                pp_boundary.query("reflect_all_velocities", reflect_all);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!reflect_all,
+                    "moving_wall requires boundary.reflect_all_velocities = false");
+            }
         }
 
         return {particle_boundary_lo, particle_boundary_hi};

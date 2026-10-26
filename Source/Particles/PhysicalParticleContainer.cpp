@@ -202,6 +202,11 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         species_name + "'."
     );
 
+    if (m_boundary_conditions.data.xmax_bc == ParticleBoundaryType::Moving_Wall) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass > 0._prt,
+            "moving_wall requires massive particle species; photons are not supported");
+    }
+
     utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
 
     // The hybrid-PIC electron-ion temperature relaxation (Q_ei) needs the

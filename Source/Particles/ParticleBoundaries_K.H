@@ -9,11 +9,64 @@
 
 #include "ParticleBoundaries.H"
 #include "Initialization/SampleGaussianFluxDistribution.H"
+#include "Utils/WarpXConst.H"
 
 #include <AMReX_AmrCore.H>
 
+#include <cmath>
+#include <limits>
+
 namespace ApplyParticleBoundaries {
     using namespace amrex::literals;
+
+    /** Reflect an escaped massive particle from a virtual wall that starts at
+     * x_max each step and moves at beta*c during that step. The computational
+     * boundary remains fixed: particles that cannot return inside are lost.
+     * WarpX stores u = p/m, so energy/(m*c) = sqrt(c*c + u*u).
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void
+    apply_moving_wall (amrex::ParticleReal& x, amrex::Real const xmax,
+                       amrex::ParticleReal& ux, amrex::ParticleReal const uy,
+                       amrex::ParticleReal const uz, amrex::Real const dt,
+                       amrex::Real const beta, amrex::Real const gamma_sq,
+                       bool& particle_lost)
+    {
+        amrex::Real const wall_v = beta * PhysConst::c;
+        if (dt <= 0._rt || x <= xmax + wall_v * dt) {
+            particle_lost = true;
+            return;
+        }
+
+        amrex::Real const energy_c = std::sqrt(
+            PhysConst::c * PhysConst::c + ux*ux + uy*uy + uz*uz);
+        amrex::Real const v_initial = PhysConst::c * ux / energy_c;
+        // A particle must catch up to the wall to reflect. This also protects
+        // the denominator when the particle and wall have identical speeds.
+        if (v_initial <= wall_v) {
+            particle_lost = true;
+            return;
+        }
+
+        amrex::Real t_refl = (xmax - x + v_initial * dt) / (v_initial - wall_v);
+        amrex::Real const time_tol = 16._rt *
+            std::numeric_limits<amrex::ParticleReal>::epsilon() * dt;
+        if (t_refl < -time_tol || t_refl > dt + time_tol) {
+            // For example, a particle injected outside the domain did not
+            // necessarily cross the wall during this position push.
+            particle_lost = true;
+            return;
+        }
+        if (t_refl < 0._rt) { t_refl = 0._rt; }
+        if (t_refl > dt) { t_refl = dt; }
+
+        ux = -gamma_sq * ((1._rt + beta*beta) * ux - 2._rt * beta * energy_c);
+        amrex::Real const v_reflected = PhysConst::c * ux / std::sqrt(
+            PhysConst::c * PhysConst::c + ux*ux + uy*uy + uz*uz);
+        x = xmax + wall_v * t_refl + v_reflected * (dt - t_refl);
+        particle_lost = (ux > 0._prt || x > xmax);
+    }
+
     /* \brief Applies the boundary condition on a specific axis
      *        This is called by apply_boundaries.
      */
@@ -107,6 +160,7 @@ namespace ApplyParticleBoundaries {
      *                    components (u_r, u_theta, u_z); for RSPHERE, they are
      *                    (u_r, u_theta, u_phi).
      * \param particle_lost: output, flags whether the particle was lost
+     * \param dt: duration of the position push (for moving-wall reflection)
      * \param boundaries: object with boundary condition settings
     */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -116,6 +170,7 @@ namespace ApplyParticleBoundaries {
                       [[maybe_unused]] amrex::ParticleReal& z,
                       amrex::XDim3 gridmin, amrex::XDim3 gridmax,
                       amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
+                      [[maybe_unused]] amrex::Real const dt,
                       bool& particle_lost,
                       ParticleBoundaries::ParticleBoundariesData const& boundaries,
                       amrex::RandomEngine const& engine)
@@ -125,6 +180,12 @@ namespace ApplyParticleBoundaries {
         bool change_sign_uz = false;
 
 #ifndef WARPX_DIM_1D_Z
+        if (boundaries.xmax_bc == ParticleBoundaryType::Moving_Wall && x > gridmax.x) {
+            apply_moving_wall(x, gridmax.x, ux, uy, uz, dt,
+                              boundaries.moving_wall_beta, boundaries.moving_wall_gamma_sq,
+                              particle_lost);
+            if (particle_lost) { return; }
+        }
         bool rethermalize_x = false; // stores if particle crosses x boundary and needs to be thermalized
         apply_boundary(x, gridmin.x, gridmax.x, change_sign_ux, rethermalize_x, particle_lost,
                        boundaries.xmin_bc, boundaries.xmax_bc,

@@ -1327,6 +1327,10 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid, WarpXGridBase):
         default=None,
         description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
     )
+    moving_wall_beta: float | str | None = Field(
+        default=None,
+        description="Wall velocity divided by c along +x for the moving_wall particle boundary at x_max; must satisfy abs(beta) < 1.",
+    )
     thermal_boundary_u_th: dict[str, float] | None = Field(
         default=None,
         alias="warpx_boundary_u_th",
@@ -1369,6 +1373,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid, WarpXGridBase):
         ]
         pywarpx.boundary.particle_lo = self.lower_boundary_conditions_particles
         pywarpx.boundary.particle_hi = self.upper_boundary_conditions_particles
+        pywarpx.boundary.moving_wall_beta = self.moving_wall_beta
 
         if self.thermal_boundary_u_th is not None:
             for name, val in self.thermal_boundary_u_th.items():
@@ -1468,6 +1473,10 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid, WarpXGridBase):
         default=None,
         description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
     )
+    moving_wall_beta: float | str | None = Field(
+        default=None,
+        description="Wall velocity divided by c along +x for the moving_wall particle boundary at x_max; must satisfy abs(beta) < 1.",
+    )
     thermal_boundary_u_th: dict[str, float] | None = Field(
         default=None,
         alias="warpx_boundary_u_th",
@@ -1509,6 +1518,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid, WarpXGridBase):
         ]
         pywarpx.boundary.particle_lo = self.lower_boundary_conditions_particles
         pywarpx.boundary.particle_hi = self.upper_boundary_conditions_particles
+        pywarpx.boundary.moving_wall_beta = self.moving_wall_beta
 
         if self.thermal_boundary_u_th is not None:
             for name, val in self.thermal_boundary_u_th.items():

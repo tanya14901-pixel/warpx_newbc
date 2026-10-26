@@ -47,6 +47,10 @@ PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecie
                                                   const std::string& name)
     : PhysicalParticleContainer(amr_core, ispecies, name)
 {
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_boundary_conditions.data.xmax_bc != ParticleBoundaryType::Moving_Wall,
+        "moving_wall does not support photon particle containers");
+
     const ParmParse pp_species_name(species_name);
 
 #ifdef WARPX_QED

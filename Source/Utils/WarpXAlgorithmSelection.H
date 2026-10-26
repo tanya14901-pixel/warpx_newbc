@@ -145,6 +145,7 @@ AMREX_ENUM(ParticleBoundaryType,
            Absorbing,     //!< particles crossing domain boundary are removed
            Open,          //!< particles cross domain boundary leave with damped j
            Reflecting,    //!< particles are reflected
+           Moving_Wall,   //!< relativistic moving-wall reflection at Cartesian x_max
            Periodic,      //!< particles are introduced from the periodic boundary
            Thermal,
            None,          //!< For r=0 boundary with RZ simulations

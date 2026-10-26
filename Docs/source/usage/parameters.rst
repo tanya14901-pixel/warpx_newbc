@@ -1102,6 +1102,10 @@ Domain Boundary Conditions
     * ``Reflecting``: Particles leaving the boundary are reflected from the boundary back into the domain.
       When :pp:param:`boundary.reflect_all_velocities` is false, the sign of only the normal velocity is changed, otherwise the sign of all velocities are changed.
 
+    * ``Moving_wall``: Particles leaving the upper x boundary undergo relativistic reflection
+      with the wall velocity given by :pp:param:`boundary.moving_wall_beta`.
+      This particle boundary is supported only at ``x_max`` in Cartesian 2D and 3D.
+
     * ``Thermal``: Particles leaving the boundary are reflected from the boundary back into the domain
       and their velocities are thermalized. The tangential velocity components are sampled from ``gaussian`` distribution
       and the component normal to the boundary is sampled from ``gaussian flux`` distribution.
@@ -1118,6 +1122,56 @@ Domain Boundary Conditions
     :optional:
 
     For a reflecting boundary condition, this flags whether the sign of only the normal velocity is changed or all velocities.
+
+.. pp:param:: boundary.moving_wall_beta
+    :type: ``real``
+
+    Required when ``moving_wall`` is selected. The wall velocity along positive x,
+    divided by the speed of light, must be finite and satisfy :math:`|\beta_w| < 1`.
+    Positive values describe a receding wall and negative values an approaching wall.
+    For example, to select the upper x particle boundary in 3D:
+
+    .. code-block:: text
+
+        boundary.field_lo = pec periodic periodic
+        boundary.field_hi = pec periodic periodic
+        boundary.particle_lo = reflecting periodic periodic
+        boundary.particle_hi = moving_wall periodic periodic
+        boundary.moving_wall_beta = -0.1
+
+    In PICMI, use ``upper_boundary_conditions_particles=["moving_wall", ...]``
+    and ``warpx_moving_wall_beta=-0.1`` on ``Cartesian2DGrid`` or ``Cartesian3DGrid``.
+
+    The computational boundary remains fixed at :math:`x_{\max}`. Each timestep,
+    only particles whose pushed position :math:`x_p` exceeds :math:`x_{\max}` are
+    processed, using a virtual wall trajectory :math:`x_w(\tau)=x_{\max}+\beta_w c\tau`
+    for :math:`0\leq\tau\leq\Delta t`. This trajectory starts again at
+    :math:`x_{\max}` each step; it does not represent a wall that travels continuously
+    through the domain or encounters particles that remain inside it.
+
+    A particle is removed if :math:`x_p\leq x_{\max}+\beta_w c\Delta t`.
+    Otherwise, its normal momentum is reflected by a Lorentz transformation to the
+    wall rest frame and back, while its tangential momentum components remain unchanged.
+    The collision time is reconstructed from the incoming normal velocity :math:`v_i`:
+
+    .. math::
+
+        \tau_r = \frac{x_{\max}-x_p+v_i\Delta t}{v_i-\beta_w c},
+        \qquad
+        x_r = x_{\max}+\beta_w c\tau_r+v_r(\Delta t-\tau_r),
+
+    where :math:`v_r` is the reflected normal velocity. Particles with no valid
+    collision during the step, with positive reflected normal momentum, or with
+    :math:`x_r>x_{\max}` are removed. Only the normal position is corrected.
+    At zero wall speed this reduces to stationary specular reflection.
+
+    This option requires massive particles, explicit time stepping, no subcycling,
+    no moving window, zero Galilean velocity, and
+    :pp:param:`boundary.reflect_all_velocities` set to ``false``.
+    Field boundary conditions remain independently specified. Charge and current
+    guard cells use the existing static reflective treatment; this particle model
+    does not add charge-conserving deposition for the corrected moving-wall trajectory
+    or moving-conductor electromagnetic boundary conditions.
 
 .. pp:param:: boundary.verboncoeur_axis_correction
     :type: ``bool``
